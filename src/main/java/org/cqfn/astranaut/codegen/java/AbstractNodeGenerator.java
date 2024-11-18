@@ -23,84 +23,57 @@
  */
 package org.cqfn.astranaut.codegen.java;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
-import org.cqfn.astranaut.rules.Instruction;
-import org.cqfn.astranaut.rules.Node;
+import java.util.Set;
+import org.cqfn.astranaut.dsl.AbstractNodeDescriptor;
 
 /**
- * Generates source code for rules that describe abstract nodes.
- *
- * @since 0.1.5
+ * Generator that creates compilation units that describe an abstract node.
+ * @since 1.0.0
  */
-final class AbstractNodeGenerator extends BaseGenerator {
+public final class AbstractNodeGenerator implements  RuleGenerator {
     /**
-     * The DSL instruction.
+     * Descriptor on the basis of which the source code will be built.
      */
-    private final Instruction<Node> instruction;
+    private final AbstractNodeDescriptor rule;
 
     /**
      * Constructor.
-     * @param env The environment required for generation.
-     * @param instruction The DSL instruction
+     * @param rule Descriptor on the basis of which the source code will be built
      */
-    AbstractNodeGenerator(final Environment env, final Instruction<Node> instruction) {
-        super(env);
-        this.instruction = instruction;
+    public AbstractNodeGenerator(final AbstractNodeDescriptor rule) {
+        this.rule = rule;
     }
 
     @Override
-    public CompilationUnit generate() {
-        final Environment env = this.getEnv();
-        final Node rule = this.instruction.getRule();
-        final String type = rule.getType();
-        final Interface iface = new Interface(
-            String.format("Node that describes the '%s' type", type),
-            type
-        );
-        if (this.getEnv().whetherToAddGeneratorVersion()) {
-            iface.addGeneratorVersion();
-        }
-        this.defineGettersForTaggedFields(iface);
-        final String pkg = this.getPackageName(this.instruction.getLanguage());
-        final CompilationUnit unit = new CompilationUnit(env.getLicense(), pkg, iface);
-        final List<String> hierarchy = env.getHierarchy(type);
-        if (hierarchy.size() > 1) {
-            String ancestor = hierarchy.get(1);
-            if (ancestor.equals(rule.getType())) {
-                final String dir = env.getRootPackage().concat(".green.");
-                ancestor = dir.concat(ancestor);
-            }
-            iface.setInterfaces(ancestor);
+    public Set<CompilationUnit> createUnits(final Context context) {
+        final String name = this.rule.getName();
+        final String brief = String.format("Node of the '%s' type.", name);
+        final Interface iface = new Interface(name, brief);
+        iface.makePublic();
+        final List<AbstractNodeDescriptor> bases = this.rule.getBaseDescriptors();
+        boolean node = false;
+        if (bases.isEmpty()) {
+            node = true;
+            iface.setExtendsList(Strings.TYPE_NODE);
         } else {
-            final String base = "org.cqfn.astranaut.core.base";
-            unit.addImport(base.concat(".Node"));
-            iface.setInterfaces("Node");
+            iface.setExtendsList(
+                bases.stream()
+                    .map(AbstractNodeDescriptor::getName)
+                    .toArray(String[]::new)
+            );
         }
-        return unit;
-    }
-
-    /**
-     * Creates getter methods for tagged fields.
-     * @param iface Where to create
-     */
-    private void defineGettersForTaggedFields(final Interface iface) {
-        final List<TaggedChild> tags = this.getEnv().getTags(this.instruction.getRule().getType());
-        for (final TaggedChild child : tags) {
-            if (!child.isOverridden()) {
-                final String type = child.getType();
-                final String tag = child.getTag();
-                final MethodDescriptor getter = new MethodDescriptor(
-                    String.format("Returns the child with the '%s' tag", tag),
-                    String.format(
-                        "get%s%s",
-                        tag.substring(0, 1).toUpperCase(Locale.ENGLISH),
-                        tag.substring(1)
-                    )
-                );
-                getter.setReturnType(type, "The node");
-                iface.addMethod(getter);
-            }
+        iface.setVersion(context.getVersion());
+        final CompilationUnit unit = new CompilationUnit(
+            context.getLicense(),
+            context.getPackage(),
+            iface
+        );
+        if (node) {
+            final String base = "org.cqfn.astranaut.core.base.";
+            unit.addImport(base.concat(Strings.TYPE_NODE));
         }
+        return Collections.singleton(unit);
     }
 }

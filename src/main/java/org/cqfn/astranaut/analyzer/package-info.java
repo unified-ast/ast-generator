@@ -23,8 +23,8 @@
  */
 
 /**
- * This package contains the analyzer of rules in DSL code.
- *
- * @since 0.1.5
+ * This package contains an analyzer that analyzes an Astranaut program before
+ *  code generation or execution and builds the necessary relationships between rules.
+ * @since 1.0.0
  */
 package org.cqfn.astranaut.analyzer;
